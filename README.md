@@ -28,3 +28,29 @@ Opens at http://localhost:5173
 - On the Team Members page, Admins can click **Import from Excel** to bulk-upload
   members from an `.xlsx` file. A ready-to-fill template is at `public/bulk_import_template.xlsx`
   (downloadable from within the app).
+
+
+## Updated login and UPI payment flow
+
+- Team member login now requires selecting a Team first.
+- After selecting a Team, the Team member dropdown is populated from the API.
+- Selecting a member automatically fills the default password `Member@123`; the password remains editable.
+- Member login is validated by both Team ID and Member ID on the backend.
+- The Pay button now opens a payment-app chooser instead of immediately marking the payment as successful.
+- Google Pay, PhonePe, Paytm, BHIM and a generic UPI option are provided.
+- The selected app receives the team's configured UPI ID and the entered amount through a UPI deep link.
+- The browser cannot reliably confirm whether an external UPI app completed a payment. Therefore the payment is not marked as paid just because the app was opened.
+
+Run the frontend with:
+
+```text
+npm install
+npm run dev
+```
+
+For production:
+
+```text
+npm install
+npm run build
+```

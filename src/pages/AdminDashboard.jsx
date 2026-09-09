@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
+import { Users, IndianRupee, Wallet, Check } from 'lucide-react'
 import { getMembers, getExpenditures } from '../api/api'
 import { dummyMembers, dummyExpenditures } from '../api/dummyData'
 import { useAuth } from '../context/AuthContext'
-import CalendarPage from './CalendarPage'
 
 export default function AdminDashboard() {
   const { isAdmin, user } = useAuth()
@@ -26,20 +26,32 @@ export default function AdminDashboard() {
       {isAdmin && (
         <div className="stat-grid">
           <div className="stat-card">
-            <span className="stat-label">Members Paid</span>
-            <span className="stat-value">{paidCount} / {members.length}</span>
+            <span className="stat-card-icon"><Check size={18} strokeWidth={2} /></span>
+            <span>
+              <span className="stat-value">{paidCount} / {members.length}</span>
+              <span className="stat-label">Members Paid</span>
+            </span>
           </div>
           <div className="stat-card">
-            <span className="stat-label">Chanda Collected</span>
-            <span className="stat-value">₹{totalPaid}</span>
+            <span className="stat-card-icon"><IndianRupee size={18} strokeWidth={2} /></span>
+            <span>
+              <span className="stat-value">₹{totalPaid}</span>
+              <span className="stat-label">Chanda Collected</span>
+            </span>
           </div>
           <div className="stat-card">
-            <span className="stat-label">Chanda Pending</span>
-            <span className="stat-value">₹{totalDue - totalPaid}</span>
+            <span className="stat-card-icon"><IndianRupee size={18} strokeWidth={2} /></span>
+            <span>
+              <span className="stat-value">₹{totalDue - totalPaid}</span>
+              <span className="stat-label">Chanda Pending</span>
+            </span>
           </div>
           <div className="stat-card">
-            <span className="stat-label">Total Expenditure</span>
-            <span className="stat-value">₹{totalSpent}</span>
+            <span className="stat-card-icon"><Wallet size={18} strokeWidth={2} /></span>
+            <span>
+              <span className="stat-value">₹{totalSpent}</span>
+              <span className="stat-label">Total Expenditure</span>
+            </span>
           </div>
         </div>
       )}
@@ -48,15 +60,16 @@ export default function AdminDashboard() {
         <div className="stat-grid">
           {members.map((m) => (
             <div className="stat-card" key={m.id}>
-              <span className="stat-label">Your Due</span>
-              <span className="stat-value">₹{m.amountDue - m.amountPaid} remaining</span>
+              <span className="stat-card-icon"><Users size={18} strokeWidth={2} /></span>
+              <span>
+                <span className="stat-value">₹{m.amountDue - m.amountPaid} remaining</span>
+                <span className="stat-label">Your Due</span>
+              </span>
             </div>
           ))}
         </div>
       )}
 
-      <h2 className="section-title">Upcoming Dates</h2>
-      <CalendarPage embedded />
     </div>
   )
 }

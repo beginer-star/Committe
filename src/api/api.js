@@ -20,6 +20,10 @@ export const login = (username, password) =>
 export const registerTeam = (data) => api.post('/teams/register', data)
 
 export const getTeams = () => api.get('/teams')
+export const getLoginTeams = () => api.get('/auth/teams')
+export const getTeamMembersForLogin = (teamId) => api.get(`/auth/teams/${teamId}/members`)
+export const memberLogin = (teamId, memberId, password) => api.post('/auth/member-login', { teamId, memberId, password })
+export const getUpiOptions = (id, amount) => api.get(`/members/${id}/upi-options`, { params: { amount } })
 
 // ---------------- Members ----------------
 export const getMembers = () => api.get('/members')

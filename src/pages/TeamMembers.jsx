@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
+import { UserPlus, Upload, X, Smartphone } from 'lucide-react'
 import {
-  getMembers, createMember, deleteMember, payMember, getUpiLink, bulkImportMembers
+  getMembers, createMember, deleteMember, getUpiOptions, payMember, bulkImportMembers
 } from '../api/api'
 import { dummyMembers } from '../api/dummyData'
 import { useAuth } from '../context/AuthContext'
@@ -9,9 +10,10 @@ export default function TeamMembers() {
   const { isAdmin } = useAuth()
   const [members, setMembers] = useState([])
   const [payAmounts, setPayAmounts] = useState({})
+  const [payment, setPayment] = useState(null)
+  const [loadingPayment, setLoadingPayment] = useState(false)
   const [showAddForm, setShowAddForm] = useState(false)
   const [newMember, setNewMember] = useState({ name: '', mobile: '', username: '', password: '', amountDue: '' })
-
   const [showImport, setShowImport] = useState(false)
   const [importFile, setImportFile] = useState(null)
   const [importResult, setImportResult] = useState(null)
@@ -50,13 +52,37 @@ export default function TeamMembers() {
     const amount = Number(payAmounts[member.id] || (member.amountDue - member.amountPaid))
     if (!amount || amount <= 0) return
 
+    setLoadingPayment(true)
     try {
-      const linkRes = await getUpiLink(member.id, amount)
-      window.location.href = linkRes.data.upiLink
-      await payMember(member.id, { amount, upiApp: 'PhonePe' })
+      const res = await getUpiOptions(member.id, amount)
+      setPayment({ member, amount, upiId: res.data.upiId, options: res.data.options })
+    } catch (err) {
+      alert(err.response?.data?.message || 'Could not load payment options.')
+    } finally {
+      setLoadingPayment(false)
+    }
+  }
+
+  const openPaymentApp = (option) => {
+    const href = option.fallback || option.scheme
+    const a = document.createElement('a')
+    a.href = href
+    a.target = '_self'
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+  }
+
+  const confirmPayment = async () => {
+    if (!payment) return
+    try {
+      const app = payment.selectedApp || 'UPI'
+      await payMember(payment.member.id, { amount: payment.amount, upiApp: app })
+      setPayment(null)
+      setPayAmounts({ ...payAmounts, [payment.member.id]: '' })
       loadMembers()
-    } catch {
-      alert('Could not process payment — check the backend connection.')
+    } catch (err) {
+      alert(err.response?.data?.message || 'Could not record payment.')
     }
   }
 
@@ -67,7 +93,7 @@ export default function TeamMembers() {
     setImportResult(null)
     try {
       const res = await bulkImportMembers(importFile)
-      setImportResult(res.data) // { totalRows, imported, skipped, details: [...] }
+      setImportResult(res.data)
       loadMembers()
     } catch (err) {
       alert(err.response?.data?.message || 'Import failed — check the backend connection and file format.')
@@ -85,10 +111,10 @@ export default function TeamMembers() {
         {isAdmin && (
           <div className="import-actions">
             <button onClick={() => setShowAddForm((v) => !v)}>
-              {showAddForm ? 'Cancel' : '+ Add Member'}
+              {showAddForm ? 'Cancel' : (<><UserPlus size={14} strokeWidth={2.4} /> Add Member</>)}
             </button>
             <button onClick={() => setShowImport((v) => !v)}>
-              {showImport ? 'Cancel Import' : '⇪ Import from Excel'}
+              {showImport ? 'Cancel Import' : (<><Upload size={14} strokeWidth={2.4} /> Import from Excel</>)}
             </button>
           </div>
         )}
@@ -119,13 +145,8 @@ export default function TeamMembers() {
             <a className="template-link" href="/bulk_import_template.xlsx" download>Download template</a>
           </p>
           <form className="inline-form" onSubmit={handleImport}>
-            <input
-              type="file"
-              accept=".xlsx"
-              ref={fileInputRef}
-              onChange={(e) => setImportFile(e.target.files[0])}
-              required
-            />
+            <input type="file" accept=".xlsx" ref={fileInputRef}
+              onChange={(e) => setImportFile(e.target.files[0])} required />
             <button type="submit" disabled={importing || !importFile}>
               {importing ? 'Importing...' : 'Upload & Import'}
             </button>
@@ -173,29 +194,50 @@ export default function TeamMembers() {
               <td>₹{m.amountDue}</td>
               <td>₹{m.amountPaid}</td>
               <td>
-                <input
-                  type="number"
-                  className="pay-input"
+                <input type="number" className="pay-input"
                   placeholder={`${m.amountDue - m.amountPaid}`}
                   value={payAmounts[m.id] || ''}
                   onChange={(e) => setPayAmounts({ ...payAmounts, [m.id]: e.target.value })}
-                  disabled={m.isPaid}
-                />
+                  disabled={m.isPaid} />
               </td>
               <td>
-                <button className="pay-btn" disabled={m.isPaid} onClick={() => handlePay(m)}>
-                  {m.isPaid ? 'Paid ✓' : 'Pay'}
+                <button className="pay-btn" disabled={m.isPaid || loadingPayment} onClick={() => handlePay(m)}>
+                  {m.isPaid ? 'Paid ✓' : loadingPayment ? 'Loading...' : 'Pay'}
                 </button>
               </td>
-              {isAdmin && (
-                <td>
-                  <button className="danger-btn" onClick={() => handleDelete(m.id)}>Remove</button>
-                </td>
-              )}
+              {isAdmin && <td><button className="danger-btn" onClick={() => handleDelete(m.id)}>Remove</button></td>}
             </tr>
           ))}
         </tbody>
       </table>
+
+      {payment && (
+        <div className="payment-overlay" onClick={() => setPayment(null)}>
+          <div className="payment-modal" onClick={(e) => e.stopPropagation()}>
+            <button className="payment-close" onClick={() => setPayment(null)} aria-label="Close">
+              <X size={18} />
+            </button>
+            <div className="payment-icon"><Smartphone size={22} /></div>
+            <h2>Choose payment app</h2>
+            <p className="payment-member">{payment.member.name} · ₹{payment.amount.toFixed(2)}</p>
+            <div className="upi-box">
+              <span>UPI ID</span>
+              <strong>{payment.upiId}</strong>
+            </div>
+            <div className="payment-options">
+              {payment.options.map((option) => (
+                <button key={option.id} className="payment-option" onClick={() => { setPayment({ ...payment, selectedApp: option.name }); openPaymentApp(option) }}>
+                  <span className="payment-option-icon">{option.icon}</span>
+                  <span>{option.name}</span>
+                  <span className="payment-arrow">›</span>
+                </button>
+              ))}
+            </div>
+            <button className="payment-confirm-btn" type="button" onClick={confirmPayment}>I completed the payment</button>
+            <p className="payment-note">The selected app opens with the amount and team UPI ID already filled in. After completing the payment, return here and confirm it.</p>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

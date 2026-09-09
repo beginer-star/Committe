@@ -46,6 +46,7 @@ export default function TeamRegister() {
 
   return (
     <div className="login-page">
+      <div className="login-mark">॥ श्री ॥</div>
       <form className="login-card register-card" onSubmit={handleSubmit}>
         <h1>Register Your Team</h1>
         <p className="subtitle">Create a committee admin account</p>
