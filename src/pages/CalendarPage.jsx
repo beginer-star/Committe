@@ -43,7 +43,11 @@ export default function CalendarPage() {
     })
   }, [cursor])
 
-  const eventsOn = (d) => events.filter(e => sameDay(new Date(e.date), d))
+  const visibleEvents = isAdmin
+    ? events.filter(e => e.type?.toLowerCase() === 'event')
+    : events.filter(e => e.memberId === user?.userId && (e.type === 'Available' || e.type === 'Unavailable'))
+
+  const eventsOn = (d) => visibleEvents.filter(e => sameDay(new Date(e.date), d))
 
   const openForm = (d) => {
     setSelectedDate(iso(d))
@@ -87,8 +91,8 @@ export default function CalendarPage() {
     <div className="page calendar-page">
       <div className="page-header">
         <div>
-          <h1>Calendar</h1>
-          <p className="page-subtitle">{isAdmin ? 'Manage team events' : 'Update your availability'}</p>
+          <h1>{isAdmin ? 'Event Calendar' : 'My Availability Calendar'}</h1>
+          <p className="page-subtitle">{isAdmin ? 'Manage team events' : 'Mark your available and unavailable days'}</p>
         </div>
       </div>
 
@@ -126,7 +130,7 @@ export default function CalendarPage() {
       </div>
       {error && <p className="error-text calendar-error">{error}</p>}
 
-      {!isAdmin && events.length > 0 && (
+      {!isAdmin && visibleEvents.length > 0 && (
         <div className="calendar-info-card">
           <strong>Your availability</strong>
           <span>Click any date to mark yourself Available or Not Available.</span>
