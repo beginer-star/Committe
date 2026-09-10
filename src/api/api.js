@@ -31,6 +31,8 @@ export const createMember = (data) => api.post('/members', data)
 export const updateMember = (id, data) => api.put(`/members/${id}`, data)
 export const deleteMember = (id) => api.delete(`/members/${id}`)
 export const payMember = (id, data) => api.post(`/members/${id}/pay`, data)
+export const getPayments = () => api.get('/payments')
+export const approvePayment = (id) => api.post(`/payments/${id}/approve`)
 export const getUpiLink = (id, amount) => api.get(`/members/${id}/upi-link`, { params: { amount } })
 
 // Bulk import members from an .xlsx file (Admin only)

@@ -39,6 +39,12 @@ export default function Sidebar() {
             <span>Expenditure</span>
           </NavLink>
         )}
+          {!isAdmin && (
+          <NavLink to="/expenditure" className="nav-link">
+            <Wallet size={16} strokeWidth={2.2} />
+            <span>Expenditure</span>
+          </NavLink>
+        )}
         <NavLink to="/calendar" className="nav-link">
           <CalendarIcon size={16} strokeWidth={2.2} />
           <span>Calendar</span>

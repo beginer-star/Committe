@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { UserPlus, Upload, X, Smartphone } from 'lucide-react'
 import {
-  getMembers, createMember, deleteMember, getUpiOptions, payMember, bulkImportMembers
+  getMembers, createMember, deleteMember, getUpiOptions, payMember, bulkImportMembers,
+  getPayments
 } from '../api/api'
 import { dummyMembers } from '../api/dummyData'
 import { useAuth } from '../context/AuthContext'
@@ -9,8 +10,10 @@ import { useAuth } from '../context/AuthContext'
 export default function TeamMembers() {
   const { isAdmin } = useAuth()
   const [members, setMembers] = useState([])
+  const [payments, setPayments] = useState([])
   const [payAmounts, setPayAmounts] = useState({})
   const [payment, setPayment] = useState(null)
+  const [transactionId, setTransactionId] = useState('')
   const [loadingPayment, setLoadingPayment] = useState(false)
   const [showAddForm, setShowAddForm] = useState(false)
   const [newMember, setNewMember] = useState({ name: '', mobile: '', username: '', password: '', amountDue: '' })
@@ -20,11 +23,38 @@ export default function TeamMembers() {
   const [importing, setImporting] = useState(false)
   const fileInputRef = useRef(null)
 
-  const loadMembers = () => {
-    getMembers().then((r) => setMembers(r.data)).catch(() => setMembers(dummyMembers))
+  const loadMembers = async () => {
+    try {
+      const r = await getMembers()
+      setMembers(Array.isArray(r.data) ? r.data : [])
+    } catch {
+      setMembers(dummyMembers)
+    }
   }
 
-  useEffect(loadMembers, [])
+  const loadPayments = async () => {
+    try {
+      const r = await getPayments()
+      setPayments(Array.isArray(r.data) ? r.data : [])
+    } catch {
+      setPayments([])
+    }
+  }
+
+  useEffect(() => {
+    loadMembers()
+    loadPayments()
+    const timer = window.setInterval(() => {
+      loadMembers()
+      loadPayments()
+    }, 10000)
+    return () => window.clearInterval(timer)
+  }, [])
+
+  const latestPaymentByUser = payments.reduce((map, item) => {
+    if (!map[item.userId]) map[item.userId] = item
+    return map
+  }, {})
 
   const handleAdd = async (e) => {
     e.preventDefault()
@@ -55,6 +85,7 @@ export default function TeamMembers() {
     setLoadingPayment(true)
     try {
       const res = await getUpiOptions(member.id, amount)
+      setTransactionId('')
       setPayment({ member, amount, upiId: res.data.upiId, options: res.data.options })
     } catch (err) {
       alert(err.response?.data?.message || 'Could not load payment options.')
@@ -77,10 +108,16 @@ export default function TeamMembers() {
     if (!payment) return
     try {
       const app = payment.selectedApp || 'UPI'
-      await payMember(payment.member.id, { amount: payment.amount, upiApp: app })
+      await payMember(payment.member.id, {
+        amount: payment.amount,
+        upiApp: app,
+        transactionId: transactionId.trim() || null
+      })
       setPayment(null)
+      setTransactionId('')
       setPayAmounts({ ...payAmounts, [payment.member.id]: '' })
-      loadMembers()
+      await Promise.all([loadMembers(), loadPayments()])
+      alert('Payment request submitted. It is pending admin approval.')
     } catch (err) {
       alert(err.response?.data?.message || 'Could not record payment.')
     }
@@ -102,6 +139,14 @@ export default function TeamMembers() {
       setImportFile(null)
       if (fileInputRef.current) fileInputRef.current.value = ''
     }
+  }
+
+  const paymentLabel = (member) => {
+    const item = latestPaymentByUser[member.id]
+    if (!item) return 'No payment'
+    if (item.status === 0) return 'Pending approval'
+    if (item.status === 1) return 'Paid ✓'
+    return 'Failed'
   }
 
   return (
@@ -172,44 +217,52 @@ export default function TeamMembers() {
         </div>
       )}
 
-      <table className="grid-table">
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Username</th>
-            <th>Mobile</th>
-            <th>Due</th>
-            <th>Paid</th>
-            <th>Pay Amount</th>
-            <th></th>
-            {isAdmin && <th></th>}
-          </tr>
-        </thead>
-        <tbody>
-          {members.map((m) => (
-            <tr key={m.id}>
-              <td>{m.name}</td>
-              <td>{m.username}</td>
-              <td>{m.mobile}</td>
-              <td>₹{m.amountDue}</td>
-              <td>₹{m.amountPaid}</td>
-              <td>
-                <input type="number" className="pay-input"
-                  placeholder={`${m.amountDue - m.amountPaid}`}
-                  value={payAmounts[m.id] || ''}
-                  onChange={(e) => setPayAmounts({ ...payAmounts, [m.id]: e.target.value })}
-                  disabled={m.isPaid} />
-              </td>
-              <td>
-                <button className="pay-btn" disabled={m.isPaid || loadingPayment} onClick={() => handlePay(m)}>
-                  {m.isPaid ? 'Paid ✓' : loadingPayment ? 'Loading...' : 'Pay'}
-                </button>
-              </td>
-              {isAdmin && <td><button className="danger-btn" onClick={() => handleDelete(m.id)}>Remove</button></td>}
+      <div className="grid-table-wrap">
+        <table className="grid-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Username</th>
+              <th>Mobile</th>
+              <th>Due</th>
+              <th>Paid</th>
+              <th>Payment Status</th>
+              <th>Pay Amount</th>
+              <th></th>
+              {isAdmin && <th></th>}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {members.map((m) => (
+              <tr key={m.id}>
+                <td>{m.name}</td>
+                <td>{m.username}</td>
+                <td>{m.mobile}</td>
+                <td>₹{m.amountDue}</td>
+                <td>₹{m.amountPaid}</td>
+                <td>
+                  <span className={`payment-status payment-status-${latestPaymentByUser[m.id]?.status ?? 'none'}`}>
+                    {m.isPaid ? 'Paid ✓' : paymentLabel(m)}
+                  </span>
+                </td>
+                <td>
+                  <input type="number" className="pay-input"
+                    placeholder={`${m.amountDue - m.amountPaid}`}
+                    value={payAmounts[m.id] || ''}
+                    onChange={(e) => setPayAmounts({ ...payAmounts, [m.id]: e.target.value })}
+                    disabled={m.isPaid || (!isAdmin && latestPaymentByUser[m.id]?.status === 0)} />
+                </td>
+                <td>
+                  <button className="pay-btn" disabled={m.isPaid || loadingPayment || (!isAdmin && latestPaymentByUser[m.id]?.status === 0)} onClick={() => handlePay(m)}>
+                    {m.isPaid ? 'Paid ✓' : (!isAdmin && latestPaymentByUser[m.id]?.status === 0) ? 'Pending' : loadingPayment ? 'Loading...' : 'Pay'}
+                  </button>
+                </td>
+                {isAdmin && <td><button className="danger-btn" onClick={() => handleDelete(m.id)}>Remove</button></td>}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
       {payment && (
         <div className="payment-overlay" onClick={() => setPayment(null)}>
@@ -233,8 +286,10 @@ export default function TeamMembers() {
                 </button>
               ))}
             </div>
+            <label className="payment-transaction-label">UPI transaction/reference ID (optional)</label>
+            <input className="payment-transaction-input" value={transactionId} onChange={(e) => setTransactionId(e.target.value)} placeholder="Example: 123456789012" />
             <button className="payment-confirm-btn" type="button" onClick={confirmPayment}>I completed the payment</button>
-            <p className="payment-note">The selected app opens with the amount and team UPI ID already filled in. After completing the payment, return here and confirm it.</p>
+            <p className="payment-note">After completing the payment, return here and submit it. The payment will stay pending until an admin checks the payment and clicks Received.</p>
           </div>
         </div>
       )}

@@ -44,16 +44,39 @@ export default function CalendarPage() {
   }, [cursor])
 
   const visibleEvents = isAdmin
-    ? events.filter(e => e.type?.toLowerCase() === 'event')
-    : events.filter(e => e.memberId === user?.userId && (e.type === 'Available' || e.type === 'Unavailable'))
+    ? events
+    : events.filter(e => e.memberId === user?.userId && (e.type === 'Available' || e.type === 'Unavailable' || e.type?.toLowerCase() === 'event'))
 
   const eventsOn = (d) => visibleEvents.filter(e => sameDay(new Date(e.date), d))
 
   const openForm = (d) => {
+    const dayEvents = eventsOn(d)
+    const existingEvent = dayEvents.find(e => e.type?.toLowerCase() === 'event')
+
+    if (isAdmin && !existingEvent) {
+      setSelectedDate(iso(d))
+      setType('Event')
+      setEventName('')
+      setAvailableDays(1)
+      setError('')
+      setShowForm(true)
+      return
+    }
+
+    if (isAdmin) {
+      setSelectedDate(iso(d))
+      setType('Event')
+      setEventName(existingEvent?.eventName || '')
+      setAvailableDays(1)
+      setError('')
+      setShowForm(true)
+      return
+    }
+
     setSelectedDate(iso(d))
-    setType(isAdmin ? 'Event' : 'Available')
-    const existing = eventsOn(d).find(e => isAdmin ? e.type === 'Event' : e.memberId === user?.userId)
-    setEventName(existing?.eventName || (isAdmin ? '' : 'Available'))
+    setType('Available')
+    const existing = dayEvents.find(e => e.memberId === user?.userId && (e.type === 'Available' || e.type === 'Unavailable'))
+    setEventName(existing?.eventName || 'Available')
     setAvailableDays(existing?.availableDays || 1)
     setError('')
     setShowForm(true)
@@ -92,7 +115,7 @@ export default function CalendarPage() {
       <div className="page-header">
         <div>
           <h1>{isAdmin ? 'Event Calendar' : 'My Availability Calendar'}</h1>
-          <p className="page-subtitle">{isAdmin ? 'Manage team events' : 'Mark your available and unavailable days'}</p>
+          <p className="page-subtitle">{isAdmin ? 'Monitor member availability and team events' : 'Mark your available and unavailable days'}</p>
         </div>
       </div>
 
@@ -113,7 +136,7 @@ export default function CalendarPage() {
                 <div className="calendar-cell-events">
                   {dayEvents.slice(0, 2).map(ev => (
                     <span key={ev.id} className={`calendar-event ${ev.type === 'Unavailable' ? 'unavailable' : ev.type === 'Event' ? 'team-event' : 'available'}`}>
-                      <strong>{ev.type === 'Event' ? ev.eventName : (ev.memberId === user?.userId ? 'My availability' : ev.memberName)}</strong>
+                      <strong>{ev.type === 'Event' ? ev.eventName : (isAdmin ? (ev.memberName || 'Member') : 'My availability')}</strong>
                       <small>{ev.type === 'Event' ? 'Event' : ev.type}</small>
                     </span>
                   ))}
@@ -126,7 +149,7 @@ export default function CalendarPage() {
       </div>
 
       <div className="calendar-legend">
-        {isAdmin ? <span className="legend-event">Team event</span> : <><span className="legend-available">Available</span><span className="legend-unavailable">Not available</span></>}
+        {isAdmin ? <><span className="legend-event">Team event</span><span className="legend-available">Member available</span><span className="legend-unavailable">Member not available</span></> : <><span className="legend-available">Available</span><span className="legend-unavailable">Not available</span></>}
       </div>
       {error && <p className="error-text calendar-error">{error}</p>}
 
@@ -142,6 +165,15 @@ export default function CalendarPage() {
           <h2 className="section-title">Team Events</h2>
           <div className="grid-table-wrap"><table className="grid-table"><thead><tr><th>Date</th><th>Event</th><th></th></tr></thead><tbody>
             {events.filter(e => e.type === 'Event').map(ev => <tr key={ev.id}><td>{new Date(ev.date).toLocaleDateString()}</td><td>{ev.eventName}</td><td><button className="danger-btn" onClick={() => removeEvent(ev.id)}>Delete</button></td></tr>)}
+          </tbody></table></div>
+        </div>
+      )}
+
+      {isAdmin && events.filter(e => e.type === 'Available' || e.type === 'Unavailable').length > 0 && (
+        <div className="calendar-events-list calendar-availability-list">
+          <h2 className="section-title">Member Availability</h2>
+          <div className="grid-table-wrap"><table className="grid-table"><thead><tr><th>Date</th><th>Member</th><th>Status</th><th>Days</th></tr></thead><tbody>
+            {events.filter(e => e.type === 'Available' || e.type === 'Unavailable').map(ev => <tr key={ev.id}><td>{new Date(ev.date).toLocaleDateString()}</td><td>{ev.memberName || 'Member'}</td><td><span className={`payment-status payment-status-${ev.type === 'Available' ? 1 : 2}`}>{ev.type === 'Available' ? 'Available' : 'Not available'}</span></td><td>{ev.availableDays}</td></tr>)}
           </tbody></table></div>
         </div>
       )}

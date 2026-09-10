@@ -31,7 +31,7 @@ export default function App() {
             <Route path="/register" element={<TeamRegister />} />
             <Route path="/" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
             <Route path="/members" element={<ProtectedRoute><TeamMembers /></ProtectedRoute>} />
-            <Route path="/expenditure" element={<ProtectedRoute adminOnly><Expenditure /></ProtectedRoute>} />
+            <Route path="/expenditure" element={<ProtectedRoute ><Expenditure /></ProtectedRoute>} />
             <Route path="/calendar" element={<ProtectedRoute><CalendarPage /></ProtectedRoute>} />
           </Routes>
         </Layout>
